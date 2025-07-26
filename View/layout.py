@@ -52,11 +52,3 @@ css = '''
     }
 </style>
 '''
-
-def main():
-    """Função vazia para execução isolada (não utilizada no contexto principal)"""
-    pass
-
-if __name__ == '__main__':
-    # Ponto de entrada para testes isolados
-    main()

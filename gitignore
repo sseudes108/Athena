@@ -1,85 +1,50 @@
-# Byte-compiled / optimized / DLL files
+# 🐍 Arquivos compilados Python
 __pycache__/
 *.py[cod]
-*.pyc
-*.pyd
-*.so
+*$py.class
 
-# Environments
-.venv/
-venv/
+# 📦 Ambientes virtuais
 env/
+venv/
 ENV/
-env.bak/
-venv.bak/
+.venv/
 
-# IDE and editor configurations
+# 🧪 Arquivos de teste e cobertura
+htmlcov/
+.coverage
+coverage.xml
+.cache
+.pytest_cache/
+
+# 📁 Configs locais de IDEs
 .vscode/
 .idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.swp
-*.sublime-*
+*.sublime-project
+*.sublime-workspace
 
-# OS generated files
+# 📂 Logs e arquivos temporários
+*.log
+*.tmp
+*.bak
+*.swp
+
+# 📊 Arquivos Jupyter e notebooks temporários
+.ipynb_checkpoints
+
+# ⚙️ Arquivos do sistema
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Logs and databases
-*.log
-*.sql
-*.sqlite
-*.sqlite3
-
-# Build artifacts
+# 📦 Build de pacotes
 build/
 dist/
 *.egg-info/
-*.egg
-*.manifest
-*.spec
 
-# Testing and coverage
-.coverage
-htmlcov/
-.tox/
-.nox/
-.pytest_cache/
-.mypy_cache/
+# 🧪 Relatórios de testes
+test-results/
+*.out
 
-# Documentation
-docs/_build/
-site/
-
-# Custom project files
-config.ini
-secrets.ini
-*.env
-*.key
-*.pem
-
-# Streamlit cache
-.streamlit/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Package manager files
-Pipfile
-Pipfile.lock
-poetry.lock
-pyproject.toml
-requirements.txt
-
-# Compression files
-*.zip
-*.tar
-*.gz
-
-# Misc
-*.bak
-*.tmp
-*~
+# 🔒 Credenciais (caso use configs locais)
+.env
+.en

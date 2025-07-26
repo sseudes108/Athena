@@ -102,11 +102,3 @@ def draw_grafico(key: str):
         
     # Renderização no Streamlit
     st.plotly_chart(fig, key=key)
-
-def main():
-    """Função vazia para execução isolada (não utilizada no contexto principal)"""
-    pass
-
-if __name__ == '__main__':
-    # Ponto de entrada para testes isolados (não usado na aplicação principal)
-    main()
