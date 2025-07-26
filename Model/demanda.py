@@ -1,3 +1,6 @@
+from itertools import accumulate
+
+
 class Demanda():
     def __init__(self):
         self.demanda = [0] * 24
@@ -12,10 +15,14 @@ class DemandaAtual(Demanda):
 class DemandaAcumulada(Demanda):
     def __init__(self):
         super().__init__()
+    
+    def recalcular_acumulo(self, derivacao):
+        acumulo = list(accumulate(derivacao))
+        self.set_demanda(acumulo)
         
 class CapacidadeOperacional(Demanda):
     def __init__(self):
         super().__init__()
         
-    def set_capacidade_operacional(self, capacidade): self.demanda = capacidade
-    def get_capacidade_operacional(self): return self.demanda
+    def set_capacidade_producao(self, capacidade): self.demanda = capacidade
+    def get_capacidade_producao(self): return self.demanda
