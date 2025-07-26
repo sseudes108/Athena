@@ -2,28 +2,28 @@ import plotly.graph_objects as go
 import streamlit as st
 
 
-def draw_grafico_demanda_capacidade(df_derivacao, color_der, df_producao, color_cap, range, key):
+def draw_grafico_demanda_capacidade(key):
     fig = go.Figure()
     
     fig.add_scatter(
-        x=df_derivacao['horario'],
-        y=df_derivacao['quantidade'],
+        x=st.session_state.df_derivacao['horario'],
+        y=st.session_state.df_derivacao['quantidade'],
         mode='lines+markers',
         name='Derivação',
         line=dict(
-            color=f'{color_der}',
+            color=f'skyblue',
             width=2,
             shape='hv'
         )
     )
     
     fig.add_scatter(
-        x=df_producao['horario'],
-        y=df_producao['quantidade'],
+        x=st.session_state.df_producao['horario'],
+        y=st.session_state.df_producao['quantidade'],
         mode='lines+markers',
         name='Produção',
         line=dict(
-            color=f'{color_cap}',
+            color=f'violet',
             width=2,
             shape='hv'
         )
@@ -31,23 +31,23 @@ def draw_grafico_demanda_capacidade(df_derivacao, color_der, df_producao, color_
     
     fig.update_layout(
         xaxis=dict(
-            range=range,
+            range=st.session_state.time_range,
             tickangle=45
         )
     )
         
     st.plotly_chart(fig, key=key)
 
-def draw_grafico(dataframe, color, range, key):
+def draw_grafico(key):
     fig = go.Figure()
     
     fig.add_scatter(
-        x=dataframe['horario'],
-        y=dataframe['quantidade'],
+        x=st.session_state.df_acumulo['horario'],
+        y=st.session_state.df_acumulo['quantidade'],
         mode='lines+markers',
         name='Acumulo',
         line=dict(
-            color=f'{color}',
+            color=f'salmon',
             width=2,
             shape='hv'
         )
@@ -61,7 +61,7 @@ def draw_grafico(dataframe, color, range, key):
     
     fig.update_layout(
         xaxis=dict(
-            range=range,
+            range=st.session_state.time_range,
             tickangle=45
         )
     )
