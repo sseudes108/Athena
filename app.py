@@ -50,12 +50,7 @@ def draw_page():
                 ],
                 key="sla_input"
             ))
-            # st.session_state.sla = st.number_input(
-            #     label="SLA - Minutos",
-            #     value=10, 
-            #     step=1, 
-            #     key="sla_input"
-            # )
+
                         
         # Coluna 3: Seletor para horário de início das operações
         with inicio_col:
@@ -93,9 +88,8 @@ def draw_page():
             st.session_state.athena = False  # força recalcular
             st.session_state.fim_op_previo = st.session_state.fim_op
             
-        if 'uploaded_file' not in st.session_state or st.session_state.uploaded_file != st.session_state.uploaded_file:
+        if 'uploaded_file' not in st.session_state or st.session_state.uploaded_file is not None:
             st.session_state.athena = False  # força recalcular
-            st.session_state.uploaded_file = False
                     
         # Coluna 5: Upload de arquivo CSV com dados de produção
         with upload_col:
@@ -109,8 +103,7 @@ def draw_page():
                 st.session_state.df_producao = Data_Man.get_dataframe_vazio()
                 st.session_state.df_acumulo = Data_Man.get_dataframe_vazio()
                 
-            else:
-                st.session_state.uploaded_file = True                                  
+            else:                         
                 # Fluxo para processamento inicial do arquivo
                 if st.session_state.athena == False:
                    
@@ -202,6 +195,13 @@ def draw_page():
             with acum_col:
                 # Gráfico de acumulação
                 Graficos.draw_grafico_acumulo('du_acum')
+                
+            with st.container():
+                hist_der_col, hist_acul_col = st.columns([1,1])
+                with hist_der_col:
+                    Graficos.draw_hist_dist(st.session_state.df_derivacao, 'der_dist_du', 1, 'Distribuição da Derivação Inicial')
+                with hist_acul_col:
+                    Graficos.draw_hist_dist(st.session_state.df_acumulo, 'aculm_dist_du', 2, 'Distribuição do Acumulo')
                                 
         # Tab 2: Sábados
         with sab_tab:
@@ -213,6 +213,13 @@ def draw_page():
             with acum_col:
                 Graficos.draw_grafico_acumulo('sab_acum')
                 
+            with st.container():
+                hist_der_col, hist_acul_col = st.columns([1,1])
+                with hist_der_col:
+                    Graficos.draw_hist_dist(st.session_state.df_derivacao, 'der_dist_sab', 1, 'Distribuição da Derivação Inicial')
+                with hist_acul_col:
+                    Graficos.draw_hist_dist(st.session_state.df_acumulo, 'aculm_dist_sab', 2, 'Distribuição do Acumulo')
+                
         # Tab 3: Domingos
         with dom_tab:
             der_cap_col, acum_col = st.columns([1,1])
@@ -222,16 +229,15 @@ def draw_page():
 
             with acum_col:
                 Graficos.draw_grafico_acumulo('dom_acum')
-    
-    # Container 3: Área de visualização dos graficos de densidade e sugestão de pausas
-    with st.container():
-        hist_der_col, hist_acul_col = st.columns([1,1])
-        with hist_der_col:
-            Graficos.draw_hist_dist(st.session_state.df_derivacao, 'der_dist', 1, 'Distribuição Derivação Inicial')
-        with hist_acul_col:
-            Graficos.draw_hist_dist(st.session_state.df_acumulo, 'aculm_dist', 2, 'Distribuição do Acumulo')
+                
+            with st.container():
+                hist_der_col, hist_acul_col = st.columns([1,1])
+                with hist_der_col:
+                    Graficos.draw_hist_dist(st.session_state.df_derivacao, 'der_dist_dom', 1, 'Distribuição da Derivação Inicial')
+                with hist_acul_col:
+                    Graficos.draw_hist_dist(st.session_state.df_acumulo, 'aculm_dist_dom', 2, 'Distribuição do Acumulo')
         
-    # Container 4: Área de exibição de resultados (tabela de analistas)
+    # Container 3: Área de exibição de resultados (tabela de analistas)
     with st.container():
         if uploaded_file is None:
             st.caption(f"Analistas - {0}")
