@@ -1,7 +1,9 @@
 # Importações de bibliotecas
 import streamlit as st  # Framework para criação de aplicações web
+from functools import partial
 
 # Importações de módulos internos
+from Model.analista import Analista
 from View import layout as Layout  # Módulo para configuração de layout
 from View import graficos as Graficos  # Módulo para criação de gráficos
 from Control import manager_data as Data_Man  # Gerenciador de dados
@@ -30,13 +32,31 @@ def draw_page():
             
         # Coluna 2: Input para SLA (Service Level Agreement)
         with sla_col:
-            st.session_state.sla = st.number_input(
+            st.session_state.sla = int(st.selectbox(
                 label="SLA - Minutos",
-                value=10, 
-                step=1, 
+                options=[
+                    '15',
+                    
+                    '03',
+                    '04',
+                    '05',
+                    '06',
+                    '10',
+                    '12',
+
+                    '20',
+                    '30',
+                    '60'
+                ],
                 key="sla_input"
-            )
-            
+            ))
+            # st.session_state.sla = st.number_input(
+            #     label="SLA - Minutos",
+            #     value=10, 
+            #     step=1, 
+            #     key="sla_input"
+            # )
+                        
         # Coluna 3: Seletor para horário de início das operações
         with inicio_col:
             st.session_state.inicio_op = st.selectbox(
@@ -52,7 +72,31 @@ def draw_page():
                 options=["22:00", "21:00"], 
                 key="fim_op_input"
             )
+        
+        # Verifica se a flag 'athena' existe no estado da sessão
+        if 'athena' not in st.session_state:
+            st.session_state.athena = False
             
+        if 'tma_previo' not in st.session_state or st.session_state.tma_previo != st.session_state.tma:
+            st.session_state.athena = False  # força recalcular
+            st.session_state.tma_previo = st.session_state.tma
+            
+        if 'sla_previo' not in st.session_state or st.session_state.sla_previo != st.session_state.sla:
+            st.session_state.athena = False  # força recalcular
+            st.session_state.sla_previo = st.session_state.sla
+            
+        if 'inicio_op_previo' not in st.session_state or st.session_state.inicio_op_previo != st.session_state.inicio_op:
+            st.session_state.athena = False  # força recalcular
+            st.session_state.inicio_op_previo = st.session_state.inicio_op
+            
+        if 'fim_op_previo' not in st.session_state or st.session_state.fim_op_previo != st.session_state.fim_op:
+            st.session_state.athena = False  # força recalcular
+            st.session_state.fim_op_previo = st.session_state.fim_op
+            
+        if 'uploaded_file' not in st.session_state or st.session_state.uploaded_file != st.session_state.uploaded_file:
+            st.session_state.athena = False  # força recalcular
+            st.session_state.uploaded_file = False
+                    
         # Coluna 5: Upload de arquivo CSV com dados de produção
         with upload_col:
             uploaded_file = st.file_uploader(label="CSV")
@@ -66,14 +110,10 @@ def draw_page():
                 st.session_state.df_acumulo = Data_Man.get_dataframe_vazio()
                 
             else:
-                # Verifica se a flag 'athena' existe no estado da sessão
-                if "athena" not in st.session_state:
-                    st.session_state.athena = False
-                
+                st.session_state.uploaded_file = True                                  
                 # Fluxo para processamento inicial do arquivo
                 if st.session_state.athena == False:
-                    # print("Athena False")
-                    
+                   
                     # Carrega o CSV para um DataFrame
                     st.session_state.df_csv = Data_Man.get_dataframe(uploaded_file)
                     
@@ -113,7 +153,9 @@ def draw_page():
                     )
 
                     # Prepara DataFrames para visualização gráfica
-                    st.session_state.df_derivacao = st.session_state.dataframe_sla
+                    st.session_state.df_derivacao = Data_Man.get_custom_dataframe(
+                        st.session_state.dataframe_sla['quantidade'].tolist()
+                    )
                     st.session_state.df_producao = Data_Man.get_custom_dataframe(
                         st.session_state.capacidade_operacional.get_capacidade_producao()
                     )
@@ -121,8 +163,22 @@ def draw_page():
                         st.session_state.demanda_acumulada.get_demanda()
                     )
                 else:
-                    pass
-                    # print("Athena True")  # Fluxo para recálculos futuros
+                    st.session_state.df_derivacao = st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
+                        st.session_state.dataframe_sla['quantidade'].tolist()
+                    )
+                    
+                    # atualizado ao adicionar ou remover analista, cada um tem uma logica diferente
+                    st.session_state.df_producao = Data_Man.get_custom_dataframe(
+                        st.session_state.capacidade_operacional.get_capacidade_producao()
+                    )
+                    
+                    acumulo_atualizado = [a - b for a, b in zip(st.session_state.demanda_acumulada.get_demanda(), st.session_state.capacidade_operacional.get_capacidade_producao())]
+                    acumulo_atualizado_sem_negativos = [max(0, v) for v in acumulo_atualizado]
+                    st.session_state.demanda_acumulada.set_demanda(acumulo_atualizado_sem_negativos)
+                    
+                    st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
+                        st.session_state.demanda_acumulada.get_demanda()
+                    )
                 
     # Container 2: Área de visualização de gráficos de demanda e acumulo
     with st.container():
@@ -141,21 +197,21 @@ def draw_page():
             
             with der_cap_col:
                 # Gráfico de demanda vs capacidade
-                Graficos.draw_grafico_demanda_capacidade('du_cap_vazio')
+                Graficos.draw_grafico_demanda_capacidade('du_cap')
 
             with acum_col:
                 # Gráfico de acumulação
-                Graficos.draw_grafico_acumulo('du_acum_vazio')
+                Graficos.draw_grafico_acumulo('du_acum')
                                 
         # Tab 2: Sábados
         with sab_tab:
             der_cap_col, acum_col = st.columns([1,1])
             
             with der_cap_col:
-                Graficos.draw_grafico_demanda_capacidade('sab_cap_vazio')
+                Graficos.draw_grafico_demanda_capacidade('sab_cap')
             
             with acum_col:
-                Graficos.draw_grafico_acumulo('sab_acum_vazio')
+                Graficos.draw_grafico_acumulo('sab_acum')
                 
         # Tab 3: Domingos
         with dom_tab:
@@ -169,11 +225,11 @@ def draw_page():
     
     # Container 3: Área de visualização dos graficos de densidade e sugestão de pausas
     with st.container():
-        histograma_col, distribuicao_col = st.columns([1,1])
-        with histograma_col:
-            st.write("Histograma")
-        with distribuicao_col:
-            st.write("Distribuição")
+        hist_der_col, hist_acul_col = st.columns([1,1])
+        with hist_der_col:
+            Graficos.draw_hist_dist(st.session_state.df_derivacao, 'der_dist', 1, 'Distribuição Derivação Inicial')
+        with hist_acul_col:
+            Graficos.draw_hist_dist(st.session_state.df_acumulo, 'aculm_dist', 2, 'Distribuição do Acumulo')
         
     # Container 4: Área de exibição de resultados (tabela de analistas)
     with st.container():
@@ -183,36 +239,64 @@ def draw_page():
             st.caption(f"Analistas - {len(st.session_state.analistas_lista)}")
             
             # Agrupa dados dos analistas para exibição
+            len(f"{st.session_state.analistas_lista}")
             analistas_agrupados = Data_Man.get_analistas_agrupados(st.session_state.analistas_lista)
             
-            # Renderiza cada analista como uma linha expandível
-            for analista, row in analistas_agrupados.iterrows():
+            for index, row in analistas_agrupados.iterrows():
                 with st.container():
                     # Divisão em colunas para diferentes informações
-                    buttons_col, contagem_col, entrada_col, almoco_col, saida_col = st.columns([1,1,1,1,1])
+                    buttons_col, contagem_col, horario_total_col, entrada_col, almoco_col, saida_col = st.columns([1,0.7,1,1,1,1])
                     
                     with buttons_col:
-                        st.caption("Buttons Add Rem")
+                        st.caption(" .")
                         add_bttn_col, rem_bttn_col = st.columns([1,1])
                         with add_bttn_col:
-                            st.button(label="Add", key=f'add_{analista}')
+                            st.button(
+                                label="➕ Add",
+                                key=f'add_{index}',
+                                on_click=partial(
+                                    st.session_state.calculadora.add_analista,
+                                    entrada=row['entrada'].strftime('%H:%M'),
+                                    almoco=row['almoco'].strftime('%H:%M'),
+                                    saida=row['saida'].strftime('%H:%M')
+                                )
+                            )
                         with rem_bttn_col:
-                            st.button(label="Rem", key=f'rem_{analista}')
+                            st.button(
+                                label="➖ Rem", 
+                                key=f'rem_{index}',
+                                on_click=partial(
+                                    st.session_state.calculadora.rem_analista,
+                                    entrada=row['entrada'].strftime('%H:%M'),
+                                    almoco=row['almoco'].strftime('%H:%M'),
+                                    saida=row['saida'].strftime('%H:%M')
+                                )
+                            )
+                            
                     with contagem_col:
                         st.caption("Quantidade")
-                        st.write(f"{row['quantidade']}")  # Volume processado
-                        
+                        st.write(f"{row['quantidade']}")
+                    
+                    with horario_total_col:
+                        st.caption("Carga Horaria")
+                        horario_formatado = Data_Man.formatar_timedelta_para_hora_minuto(row['carga_horaria'])
+                        st.write(horario_formatado)
+                    
                     with entrada_col:
                         st.caption("Entrada")
-                        st.write(f"{st.session_state.analistas_lista[analista].get_horarios()[0]}")  # Horário de entrada
-                        
+                        horario_formatado = row['entrada'].strftime('%H:%M')
+                        st.write(horario_formatado)
+                    
                     with almoco_col:
                         st.caption("Almoco")
-                        st.write(f"{st.session_state.analistas_lista[analista].get_horarios()[1]}")  # Horário de almoço
-                        
+                        horario_formatado = row['almoco'].strftime('%H:%M')
+                        st.write(horario_formatado)
+                    
                     with saida_col:
                         st.caption("Saida")
-                        st.write(f"{st.session_state.analistas_lista[analista].get_horarios()[2]}")  # Horário de saída
+                        horario_formatado = row['saida'].strftime('%H:%M')
+                        st.write(horario_formatado)
+                               
                 st.divider()  # Separador visual entre analistas
             st.session_state.athena = True  # Ativa flag para evitar recálculos desnecessários
 

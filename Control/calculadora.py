@@ -1,8 +1,9 @@
 # Módulo de orquestração de cálculos de capacidade
-
+import streamlit as st
 from itertools import accumulate  # Para cálculo cumulativo
 
 import Control.athena as Athena  # Algoritmo principal de cálculo
+from Model.analista import Analista
 from Model.demanda import DemandaAtual, DemandaAcumulada, CapacidadeOperacional  # Modelos de dados
 
 class Calculadora():   
@@ -49,3 +50,29 @@ class Calculadora():
         """
         acumulo = list(accumulate(derivacao))
         return acumulo
+    
+    @staticmethod
+    def add_analista(entrada, almoco, saida):
+        novo_analista = Analista(st.session_state.tma, entrada, almoco, saida)
+        st.session_state.analistas_lista.append(novo_analista)
+        
+        capacidade_atual = st.session_state.capacidade_operacional.get_capacidade_producao()
+        capacidade_atualizada = [a + b for a, b in zip(capacidade_atual, novo_analista.get_capacidade_producao())]
+        
+        st.session_state.capacidade_operacional.set_capacidade_producao(capacidade_atualizada)
+    
+    @staticmethod
+    def rem_analista(entrada, almoco, saida):
+        analista = Analista(st.session_state.tma, entrada, almoco, saida)
+        for i in range(len(st.session_state.analistas_lista)):
+            
+            if st.session_state.analistas_lista[i].get_horarios()[0] == entrada:
+                if st.session_state.analistas_lista[i].get_horarios()[1] == almoco:
+                    if st.session_state.analistas_lista[i].get_horarios()[2] == saida:
+                        st.session_state.novo_analista.remove(st.session_state.analistas_lista[i])
+                        break
+        
+        capacidade_atual = st.session_state.capacidade_operacional.get_capacidade_producao()
+        capacidade_atualizada = [a - b for a, b in zip(capacidade_atual, analista.get_capacidade_producao())]
+        
+        st.session_state.capacidade_operacional.set_capacidade_producao(capacidade_atualizada)

@@ -47,46 +47,43 @@ def modelo_01(tma, demanda_atual:DemandaAtual, demanda_acumulada:DemandaAcumulad
         Lista de analistas alocados
     """
     
-    analistas = []
-    novo_analista = Analista(tma, "07:00", "12:00", "15:20")
-    analistas.append(novo_analista)
-    demanda_atualizada = [a - b for a, b in zip(demanda_atual.get_demanda(), novo_analista.get_capacidade_producao())]
-    demanda_atual.set_demanda(demanda_atualizada)
-    demanda_acumulada.recalcular_acumulo(demanda_atualizada)
+    # analistas = []
+    # novo_analista = Analista(tma, "07:00", "12:00", "15:20")
+    # analistas.append(novo_analista)
+    # demanda_atualizada = [a - b for a, b in zip(demanda_atual.get_demanda(), novo_analista.get_capacidade_producao())]
+    # demanda_atual.set_demanda(demanda_atualizada)
+    # demanda_acumulada.recalcular_acumulo(demanda_atualizada)
 
-    # PICO_MANHA = Data_Man.encontrar_indice_por_horario(st.session_state.dataframe_sla, "10:00")  # Horário de pico matinal (10:00)
-    # PICO_NOITE = Data_Man.encontrar_indice_por_horario(st.session_state.dataframe_sla, "21:00")  # Horário de pico noturno (21:00)
-    # print(PICO_MANHA)
-    # print(PICO_NOITE)
+    PICO_MANHA = Data_Man.encontrar_indice_por_horario(st.session_state.dataframe_sla, "10:00")  # Horário de pico matinal (10:00)
+    PICO_NOITE = Data_Man.encontrar_indice_por_horario(st.session_state.dataframe_sla, "21:00")  # Horário de pico noturno (21:00)
     
-    # analistas = []  # Lista para armazenar analistas alocados
-    # # analistas.append(novo_analista)
+    analistas = []  # Lista para armazenar analistas alocados
 
-    # # Fase 1: Atendimento ao pico da manhã
-    # while demanda_acumulada.get_demanda()[PICO_MANHA] > 0:
-    #     # Cria novo analista com jornada fixa para turno da manhã
-    #     novo_analista = Analista(tma, "07:00", "12:00", "15:20")
-    #     analistas.append(novo_analista)
+    # Fase 1: Atendimento ao pico da manhã
+    while demanda_acumulada.get_demanda()[PICO_MANHA] > 0:
+        # Cria novo analista com jornada fixa para turno da manhã
+        novo_analista = Analista(tma, "07:00", "12:00", "15:20")
+        analistas.append(novo_analista)
         
-    #     # Atualiza demanda subtraindo a capacidade do novo analista
-    #     demanda_atualizada = [a - b for a, b in zip(demanda_atual.get_demanda(), novo_analista.get_capacidade_producao())]
+        # Atualiza demanda subtraindo a capacidade do novo analista
+        demanda_atualizada = [a - b for a, b in zip(demanda_atual.get_demanda(), novo_analista.get_capacidade_producao())]
         
-    #     # Atualiza objetos de demanda
-    #     demanda_atual.set_demanda(demanda_atualizada)
-    #     demanda_acumulada.recalcular_acumulo(demanda_atualizada)
+        # Atualiza objetos de demanda
+        demanda_atual.set_demanda(demanda_atualizada)
+        demanda_acumulada.recalcular_acumulo(demanda_atualizada)
         
-    # # Fase 2: Atendimento ao pico da noite
-    # while demanda_acumulada.get_demanda()[PICO_NOITE] > 0:
-    #     # Cria novo analista com jornada fixa para turno da tarde/noite
-    #     novo_analista = Analista(tma, "13:40", "17:30", "22:00")
-    #     analistas.append(novo_analista)
+    # Fase 2: Atendimento ao pico da noite
+    while demanda_acumulada.get_demanda()[PICO_NOITE] > 0:
+        # Cria novo analista com jornada fixa para turno da tarde/noite
+        novo_analista = Analista(tma, "13:40", "17:30", "22:00")
+        analistas.append(novo_analista)
         
-    #     # Atualiza demanda subtraindo a capacidade do novo analista
-    #     demanda_atualizada = [a - b for a, b in zip(demanda_atual.get_demanda(), novo_analista.get_capacidade_producao())]
+        # Atualiza demanda subtraindo a capacidade do novo analista
+        demanda_atualizada = [a - b for a, b in zip(demanda_atual.get_demanda(), novo_analista.get_capacidade_producao())]
         
-    #     # Atualiza objetos de demanda
-    #     demanda_atual.set_demanda(demanda_atualizada)
-    #     demanda_acumulada.recalcular_acumulo(demanda_atualizada)
+        # Atualiza objetos de demanda
+        demanda_atual.set_demanda(demanda_atualizada)
+        demanda_acumulada.recalcular_acumulo(demanda_atualizada)
                 
     # Cálculo da capacidade total de produção
     capacidade_producao_atualizada = [0] * len(demanda_atualizada)  # Inicializa com zeros
