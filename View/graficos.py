@@ -1,8 +1,9 @@
 # Módulo de visualização gráfica usando Plotly e Streamlit
+import pandas as pd
 import plotly.graph_objects as go  # Biblioteca para criação de gráficos interativos
 import streamlit as st  # Framework para criação de aplicações web
 
-def draw_grafico_demanda_capacidade(key: str):
+def draw_grafico_demanda_capacidade(key: str):  
     """
     Cria e exibe um gráfico comparando demanda (derivação) vs capacidade (produção)
     
@@ -50,14 +51,16 @@ def draw_grafico_demanda_capacidade(key: str):
     fig.update_layout(
         xaxis=dict(
             range=st.session_state.time_range,  # Faixa horária definida pelo usuário
-            tickangle=45  # Ângulo de exibição dos labels (melhor legibilidade)
-        )
+            tickangle=45, # Ângulo de exibição dos labels (melhor legibilidade)
+            tickformat='%H:%M',
+        ),
     )
         
     # Renderiza o gráfico no Streamlit usando a chave única
     st.plotly_chart(fig, key=key)
+    
 
-def draw_grafico(key: str):
+def draw_grafico_acumulo(key: str):
     """
     Cria e exibe um gráfico de acumulação de trabalho
     
@@ -81,7 +84,7 @@ def draw_grafico(key: str):
         mode='lines+markers',
         name='Acumulo',  # Legenda
         line=dict(
-            color='salmon',  # Cor salmão para destaque
+            color='gold',  # Cor gold para destaque
             width=2,
             shape='hv'  # Formato em degraus
         )
@@ -91,12 +94,14 @@ def draw_grafico(key: str):
     fig.add_scatter(
         line=dict(width=0)  # Linha invisível
     )
-    
+
     # Configurações de layout
     fig.update_layout(
         xaxis=dict(
-            range=st.session_state.time_range,  # Mesmo range temporal
-            tickangle=45  # Labels inclinados
+            # range=st.session_state.time_range,  # Mesmo range temporal
+            range=st.session_state.time_range,
+            tickangle=45,  # Labels inclinados
+            tickformat='%H:%M',
         )
     )
         

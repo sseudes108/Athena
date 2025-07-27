@@ -1,89 +1,141 @@
+from datetime import datetime, timedelta
 from math import floor  # Importa a função floor para arredondamento para baixo
+import streamlit as st
 
 # Classe que representa um analista com horários definidos e capacidade de produção por hora
 class Analista():
     def __init__(self, tma, entrada: str, almoco: str, saida: str):
         # Lista com 24 posições, uma para cada hora do dia, inicializada com 0
-        self.capacidade_producao = [0] * 24
+        self.capacidade_producao = [0] * len(st.session_state.demanda_inicial)
         
         # Tempo médio de atendimento (TMA) em segundos
         self.tma = tma
 
         # Horários recebidos em formato string: "HH:MM"
-        self.entrada: str = entrada
-        self.almoco: str = almoco
-        self.saida: str = saida
-        
+        self.entrada = datetime.strptime(entrada, "%H:%M")
+        self.almoco = datetime.strptime(almoco, "%H:%M")
+        self.saida = datetime.strptime(saida, "%H:%M")
+            
         # Calcula a capacidade de produção ao instanciar o objeto
         self.set_capacidade_producao()
         
     # Retorna a lista de horários (entrada, almoço, saída)
     def get_horarios(self):
         return [self.entrada, self.almoco, self.saida]
-        
-    # Calcula a capacidade de produção por hora com base no tempo trabalhado e TMA
+                
+    # def str_to_time(self, hora_str):
+    #     return datetime.strptime(hora_str, "%H:%M")
+
     def set_capacidade_producao(self):
-        tempo_trabalhado = [0] * 24  # Inicializa o vetor de tempo trabalhado por hora
+        # Função helper para normalização
+        def normalize_dt(dt):
+            return datetime(2000, 1, 1, dt.hour, dt.minute, dt.second)
+        
+        df_sla = st.session_state.dataframe_sla.reset_index(drop=True)
+        
+        # Normaliza todos os horários para 2000-01-01
+        entrada_dt = normalize_dt(self.entrada)
+        almoco_inicio_dt = normalize_dt(self.almoco)
+        almoco_fim_dt = normalize_dt(self.almoco) + timedelta(minutes=60)
+        saida_dt = normalize_dt(self.saida)
 
-        # Converte horários de string para horas e minutos (inteiros)
-        entrada_hora = int(self.entrada.split(':')[0])
-        entrada_minutos = int(self.entrada.split(':')[1])
-
-        almoco_hora = int(self.almoco.split(':')[0])
-        almoco_minutos = int(self.almoco.split(':')[1])
-
-        saida_hora = int(self.saida.split(':')[0])
-        saida_minutos = int(self.saida.split(':')[1])
+        tempo_trabalhado = []
         
-        # Preenche o tempo antes da entrada com 0 minutos trabalhados
-        hora = 0
-        while hora < entrada_hora:
-            tempo_trabalhado[hora] = 0
-            hora += 1
-        
-        # Calcula minutos trabalhados na hora de entrada
-        tempo_trabalhado[hora] = 60 - entrada_minutos
-        
-        # Preenche as horas completas entre entrada e almoço com 60 minutos
-        while hora < almoco_hora:
-            tempo_trabalhado[hora] = 60
-            hora += 1
-        
-        # Hora do almoço — desconta tempo se houver minutos no horário de almoço
-        if almoco_minutos > 0:
-            tempo_trabalhado[hora] = almoco_minutos  # Tempo trabalhado antes do almoço
-            hora += 1
-            tempo_trabalhado[hora] = 60 - almoco_minutos  # Tempo após o almoço
-        else:
-            tempo_trabalhado[hora] = 0  # Hora completamente de almoço
-            hora += 1
-        
-        # Horas completas entre fim do almoço e saída
-        while hora < saida_hora:
-            tempo_trabalhado[hora] = 60
-            hora += 1
+        for i in range(len(df_sla)):
+            hora_inicio = df_sla.loc[i, 'horario']
             
-        # Processa a última hora se saída não for em hora cheia
-        if saida_minutos > 0:
-            tempo_trabalhado[hora] = saida_minutos  # Minutos trabalhados na última hora
-            hora += 1
-            tempo_trabalhado[hora] = 0  # Após saída não há trabalho
+            if i < len(df_sla) - 1:
+                hora_fim = df_sla.loc[i + 1, 'horario']
+            else:
+                hora_fim = hora_inicio + timedelta(minutes=st.session_state.sla)
 
-        # Horas restantes até meia-noite são não trabalhadas
-        while hora < 24:
-            tempo_trabalhado[hora] = 0
-            hora += 1
-        
-        # Calcula a capacidade de produção por hora com base nos minutos trabalhados
-        capacidade = [0] * 24
-        for i in range(24):
-            # Cada unidade representa quantos atendimentos cabem naquela hora
-            prop_hora = floor((tempo_trabalhado[i] * 60) / self.tma)
-            capacidade[i] = prop_hora
-            
-        # Atribui a capacidade de produção final
+            minutos_trabalhados = 0
+
+            # Interseção com jornada total
+            trabalho_inicio = max(hora_inicio, entrada_dt)
+            trabalho_fim = min(hora_fim, saida_dt)
+
+            if trabalho_fim > trabalho_inicio:
+                trabalho_total = trabalho_fim - trabalho_inicio
+
+                # Subtrai interseção com o almoço
+                pausa_inicio = max(trabalho_inicio, almoco_inicio_dt)
+                pausa_fim = min(trabalho_fim, almoco_fim_dt)
+
+                if pausa_fim > pausa_inicio:
+                    pausa = pausa_fim - pausa_inicio
+                else:
+                    pausa = timedelta(minutes=0)
+
+                # CORREÇÃO: Converta para minutos
+                minutos_validos = trabalho_total.total_seconds() / 60 - pausa.total_seconds() / 60
+                minutos_trabalhados = max(0, min(minutos_validos, st.session_state.sla))
+
+            tempo_trabalhado.append(minutos_trabalhados)
+                    
+        # Agora calcula capacidade
+        capacidade = [floor(mins * 60 / self.tma) for mins in tempo_trabalhado]
+        # print(f"Tipo de hora_inicio: {type(hora_inicio)}")
+        # print(f"Tipo de entrada_dt: {type(entrada_dt)}")
+        # print(f"Diferença: {saida_dt - entrada_dt}")
+                
         self.capacidade_producao = capacidade
+        
+        
+    # def set_capacidade_producao(self):
+    #     df_sla = st.session_state.dataframe_sla.reset_index(drop=True)
+        
+    #     almoco_duracao = 60  # minutos
+        
+    #     entrada_dt = self.entrada
+    #     almoco_inicio_dt = self.almoco
+    #     almoco_fim_dt = almoco_inicio_dt + timedelta(minutes=almoco_duracao)
+    #     saida_dt = self.saida
+
+    #     tempo_trabalhado = []
+        
+    #     for i in range(len(df_sla)):
+    #         # CORREÇÃO: Não converta para string, mantenha como datetime
+    #         hora_inicio = df_sla.loc[i, 'horario']
             
+    #         if i < len(df_sla) - 1:
+    #             hora_fim = df_sla.loc[i + 1, 'horario']
+    #         else:
+    #             # CORREÇÃO: Use o último horário + SLA
+    #             hora_fim = hora_inicio + timedelta(minutes=st.session_state.sla)
+
+    #         minutos_trabalhados = 0
+
+    #         # Interseção com jornada total
+    #         trabalho_inicio = max(hora_inicio, entrada_dt)
+    #         trabalho_fim = min(hora_fim, saida_dt)
+
+    #         if trabalho_fim > trabalho_inicio:
+    #             trabalho_total = trabalho_fim - trabalho_inicio
+
+    #             # Subtrai interseção com o almoço
+    #             pausa_inicio = max(trabalho_inicio, almoco_inicio_dt)
+    #             pausa_fim = min(trabalho_fim, almoco_fim_dt)
+
+    #             if pausa_fim > pausa_inicio:
+    #                 pausa = pausa_fim - pausa_inicio
+    #             else:
+    #                 pausa = timedelta(minutes=0)
+
+    #             # CORREÇÃO: Converta para minutos
+    #             minutos_validos = trabalho_total.total_seconds() / 60 - pausa.total_seconds() / 60
+    #             minutos_trabalhados = max(0, min(minutos_validos, st.session_state.sla))
+
+    #         tempo_trabalhado.append(minutos_trabalhados)
+                    
+    #     # Agora calcula capacidade
+    #     capacidade = [floor(mins * 60 / self.tma) for mins in tempo_trabalhado]
+    #     print(f"Tipo de hora_inicio: {type(hora_inicio)}")
+    #     print(f"Tipo de entrada_dt: {type(entrada_dt)}")
+    #     print(f"Diferença: {saida_dt - entrada_dt}")
+                
+    #     self.capacidade_producao = capacidade
+
     # Retorna a lista de capacidade de produção por hora
     def get_capacidade_producao(self):
         return self.capacidade_producao

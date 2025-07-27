@@ -1,4 +1,6 @@
+from datetime import datetime, timedelta
 import pandas as pd  # Biblioteca para manipulação de dados em DataFrame
+import streamlit as st
 
 def get_dataframe_vazio():
     """
@@ -49,17 +51,20 @@ def get_custom_dataframe(quantidade):
           'quantidade': valores do parâmetro de entrada
     """
     # Gera lista de horários padrão
-    horarios = [f"{h:02d}:00" for h in range(24)]
+    horarios = []
+    for hora in range(24):
+        for minuto in range(0, 60, st.session_state.sla):
+            horarios.append(f"{hora:02d}:{minuto:02d}")
     
     # Cria DataFrame com valores personalizados
     df = pd.DataFrame({
         'horario': horarios,
         'quantidade': quantidade
     })
-    return df
     
+    return df
 
-def get_range(inicio_op:str, fim_op:str):
+def get_range(dataframe, inicio_op:str, fim_op:str):
     """
     Calcula o range horário operacional como intervalo numérico
     
@@ -71,12 +76,95 @@ def get_range(inicio_op:str, fim_op:str):
         Lista com [hora_inicio, hora_fim-1] (intervalo fechado-início, aberto-fim)
         Ex: ["08:00", "18:00"] → [8, 17]
     """
-    # Extrai componente hora das strings
-    hora_inicio = inicio_op.split(':')[0]
-    hora_fim = fim_op.split(':')[0]
+    hora_inicio_index = encontrar_indice_por_horario(dataframe, inicio_op)
+    # print(f"hora_inicio_index - {hora_inicio_index}")
+    hora_fim_index = encontrar_indice_por_horario(dataframe, fim_op)
+    # print(f"hora_fim_index - {hora_fim_index}")
+    return[hora_inicio_index, hora_fim_index]
+
+def encontrar_indice_por_horario(df:pd.DataFrame, horario_alvo):
+    """
+    Encontra o índice da linha onde a hora (sem data) é igual ao horário alvo.
+    Aceita `str` (ex: '10:00') ou `datetime.time`
+    """
+
+    if isinstance(horario_alvo, str):
+        horario_alvo = datetime.strptime(horario_alvo, "%H:%M").time()
     
-    # Converte para inteiros e ajusta limite superior
-    return [int(hora_inicio), int(hora_fim)-1]
+    matches = df.index[df['horario'].dt.time == horario_alvo].tolist()
+
+    if matches:
+        return matches[0]
+    else:
+        return None
+
+def converte_blocos_para_tempo(df):
+    df = df.copy()
+    def str_to_datetime(time_str):
+        try:
+            # Converte diretamente a string "HH:MM" para datetime
+            time_str = str(time_str)
+            return datetime.strptime(time_str, "%H:%M")
+        except ValueError:
+            # Caso o formato esteja incorreto
+            return datetime(2000, 1, 1)  # Valor padrão
+    
+    df['horario'] = df['horario'].apply(str_to_datetime)
+    return df
+
+def get_dataframe_sla(dataframe_original, sla):
+    # Gera todos os horários de blocos por SLA
+    horarios = []
+    for hora in range(24):
+        for minuto in range(0, 60, sla):
+            horarios.append(f"{hora:02d}:{minuto:02d}")
+
+    df_intervalo = pd.DataFrame({'horario': horarios})
+
+    # Adiciona hora base para merge
+    df_intervalo['hora_base'] = df_intervalo['horario'].str[:2] + ':00'
+
+    # Faz merge com original para trazer as quantidades horárias
+    df_merged = pd.merge(df_intervalo, dataframe_original, left_on='hora_base', right_on='horario', suffixes=('', '_hora'))
+
+    # Distribui proporcionalmente
+    if 60 % sla == 0:
+        proporcao = sla / 60
+        df_merged['quantidade'] = df_merged['quantidade'] * proporcao
+    else:
+        intervalos_por_hora = df_merged.groupby('hora_base')['horario'].transform('count')
+        df_merged['quantidade'] = df_merged['quantidade'] / intervalos_por_hora
+
+    # Seleciona resultado final
+    df_final = df_merged[['horario', 'quantidade']]
+
+    return df_final
+
+# def get_dataframe_sla(dataframe_original, sla):
+#     # Gera todos os horários diretamente no formato HH:MM
+#     horarios = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, sla)]
+    
+#     # Cria DataFrame temporário para merge
+#     df_intervalo = pd.DataFrame({'horario': horarios})
+
+#     # Adiciona hora base para merge
+#     df_intervalo['hora_base'] = df_intervalo['horario'].str[:2] + ':00'
+
+#     # Faz merge com original para trazer as quantidades horárias
+#     df_merged = pd.merge(df_intervalo, dataframe_original, left_on='hora_base', right_on='horario', suffixes=('', '_hora'))
+
+#     # Distribui proporcionalmente
+#     if 60 % sla == 0:
+#         proporcao = sla / 60
+#         df_merged['quantidade'] = df_merged['quantidade'] * proporcao
+#     else:
+#         intervalos_por_hora = df_merged.groupby('hora_base')['horario'].transform('count')
+#         df_merged['quantidade'] = df_merged['quantidade'] / intervalos_por_hora
+
+#     # Seleciona resultado final
+#     df_final = df_merged[['horario', 'quantidade']]
+
+#     return df_final
 
 def get_analistas_agrupados(analistas):
     """

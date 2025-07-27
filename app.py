@@ -31,7 +31,8 @@ def draw_page():
         # Coluna 2: Input para SLA (Service Level Agreement)
         with sla_col:
             st.session_state.sla = st.number_input(
-                label="SLA - Minutos", 
+                label="SLA - Minutos",
+                value=10, 
                 step=1, 
                 key="sla_input"
             )
@@ -55,16 +56,11 @@ def draw_page():
         # Coluna 5: Upload de arquivo CSV com dados de produção
         with upload_col:
             uploaded_file = st.file_uploader(label="CSV")
-            
-            # Calcula o range de tempo operacional baseado nos inputs
-            st.session_state.time_range = Data_Man.get_range(
-                st.session_state.inicio_op, 
-                st.session_state.fim_op
-            )
-            
+        
             # Lógica para tratamento do arquivo carregado
             if uploaded_file is None:
                 # Se nenhum arquivo foi carregado, inicializa dataframes vazios
+                st.session_state.time_range = [st.session_state.inicio_op.split(':')[0], st.session_state.fim_op.split(':')[0]]
                 st.session_state.df_derivacao = Data_Man.get_dataframe_vazio()
                 st.session_state.df_producao = Data_Man.get_dataframe_vazio()
                 st.session_state.df_acumulo = Data_Man.get_dataframe_vazio()
@@ -76,6 +72,7 @@ def draw_page():
                 
                 # Fluxo para processamento inicial do arquivo
                 if st.session_state.athena == False:
+                    # print("Athena False")
                     
                     # Carrega o CSV para um DataFrame
                     st.session_state.df_csv = Data_Man.get_dataframe(uploaded_file)
@@ -83,13 +80,24 @@ def draw_page():
                     # Inicializa a calculadora de capacidade
                     st.session_state.calculadora = Calculadora()
                                     
+                    # Atualizada dataframe com base no SLA
+                    st.session_state.dataframe_sla = Data_Man.get_dataframe_sla(st.session_state.df_csv, st.session_state.sla)
+                    st.session_state.dataframe_sla = Data_Man.converte_blocos_para_tempo(st.session_state.dataframe_sla)
+                    
+                    # Calcula o range de tempo
+                    st.session_state.time_range = Data_Man.get_range(
+                        st.session_state.dataframe_sla,
+                        st.session_state.inicio_op, 
+                        st.session_state.fim_op
+                    )
+                                        
                     # Cria instâncias para gestão de dados
                     (st.session_state.demanda_atual, 
                     st.session_state.demanda_acumulada, 
                     st.session_state.capacidade_operacional) = st.session_state.calculadora.create_instancias()
                     
                     # Configura demanda inicial a partir do CSV
-                    st.session_state.demanda_inicial = st.session_state.df_csv['quantidade'].tolist()
+                    st.session_state.demanda_inicial = st.session_state.dataframe_sla['quantidade'].tolist()
                     st.session_state.demanda_atual.set_demanda(st.session_state.demanda_inicial)
                     
                     # Calcula acumulo inicial e configura instância
@@ -105,7 +113,7 @@ def draw_page():
                     )
 
                     # Prepara DataFrames para visualização gráfica
-                    st.session_state.df_derivacao = st.session_state.df_csv 
+                    st.session_state.df_derivacao = st.session_state.dataframe_sla
                     st.session_state.df_producao = Data_Man.get_custom_dataframe(
                         st.session_state.capacidade_operacional.get_capacidade_producao()
                     )
@@ -113,9 +121,10 @@ def draw_page():
                         st.session_state.demanda_acumulada.get_demanda()
                     )
                 else:
-                    print("Athena True")  # Fluxo para recálculos futuros
+                    pass
+                    # print("Athena True")  # Fluxo para recálculos futuros
                 
-    # Container 2: Área de visualização de gráficos
+    # Container 2: Área de visualização de gráficos de demanda e acumulo
     with st.container():
         st.caption("Graficos")
         
@@ -136,7 +145,7 @@ def draw_page():
 
             with acum_col:
                 # Gráfico de acumulação
-                Graficos.draw_grafico('du_acum_vazio')
+                Graficos.draw_grafico_acumulo('du_acum_vazio')
                                 
         # Tab 2: Sábados
         with sab_tab:
@@ -146,7 +155,7 @@ def draw_page():
                 Graficos.draw_grafico_demanda_capacidade('sab_cap_vazio')
             
             with acum_col:
-                Graficos.draw_grafico('sab_acum_vazio')
+                Graficos.draw_grafico_acumulo('sab_acum_vazio')
                 
         # Tab 3: Domingos
         with dom_tab:
@@ -156,9 +165,17 @@ def draw_page():
                 Graficos.draw_grafico_demanda_capacidade('dom_cap')
 
             with acum_col:
-                Graficos.draw_grafico('dom_acum')
+                Graficos.draw_grafico_acumulo('dom_acum')
+    
+    # Container 3: Área de visualização dos graficos de densidade e sugestão de pausas
+    with st.container():
+        histograma_col, distribuicao_col = st.columns([1,1])
+        with histograma_col:
+            st.write("Histograma")
+        with distribuicao_col:
+            st.write("Distribuição")
         
-    # Container 3: Área de exibição de resultados (tabela de analistas)
+    # Container 4: Área de exibição de resultados (tabela de analistas)
     with st.container():
         if uploaded_file is None:
             st.caption(f"Analistas - {0}")
@@ -176,8 +193,11 @@ def draw_page():
                     
                     with buttons_col:
                         st.caption("Buttons Add Rem")
-                        st.write("Buttons")  # Placeholder para futuros botões
-                        
+                        add_bttn_col, rem_bttn_col = st.columns([1,1])
+                        with add_bttn_col:
+                            st.button(label="Add", key=f'add_{analista}')
+                        with rem_bttn_col:
+                            st.button(label="Rem", key=f'rem_{analista}')
                     with contagem_col:
                         st.caption("Quantidade")
                         st.write(f"{row['quantidade']}")  # Volume processado
@@ -193,9 +213,8 @@ def draw_page():
                     with saida_col:
                         st.caption("Saida")
                         st.write(f"{st.session_state.analistas_lista[analista].get_horarios()[2]}")  # Horário de saída
-                        
                 st.divider()  # Separador visual entre analistas
-                st.session_state.athena = True  # Ativa flag para evitar recálculos desnecessários
+            st.session_state.athena = True  # Ativa flag para evitar recálculos desnecessários
 
 def main():
     """Função de entrada da aplicação"""

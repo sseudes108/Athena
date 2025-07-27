@@ -1,9 +1,10 @@
 from itertools import accumulate  # Importa a função accumulate para calcular somatórios progressivos
+import streamlit as st
 
 class Demanda():
     def __init__(self):
         # Inicializa a lista de demanda com 24 valores (um para cada hora do dia), todos zerados
-        self.demanda = [0] * 24
+        self.demanda = [0] * len(st.session_state.dataframe_sla['quantidade'].tolist())
     
     # Define a demanda manualmente
     def set_demanda(self, demanda):
