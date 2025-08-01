@@ -5,6 +5,9 @@ import streamlit as st  # Framework para criação de aplicações web
 import numpy as np
 from scipy.stats import gaussian_kde
 
+import plotly.io as pio
+
+
 def draw_grafico_demanda_capacidade(key: str):  
     """
     Cria e exibe um gráfico comparando demanda (derivação) vs capacidade (produção)

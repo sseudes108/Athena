@@ -155,6 +155,8 @@ def draw_page():
                     st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
                         st.session_state.demanda_acumulada.get_demanda()
                     )
+                    
+                    print(st.session_state.capacidade_operacional.get_capacidade_producao())
                 else:
                     st.session_state.df_derivacao = st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
                         st.session_state.dataframe_sla['quantidade'].tolist()
@@ -170,8 +172,11 @@ def draw_page():
                     st.session_state.demanda_acumulada.set_demanda(acumulo_atualizado_sem_negativos)
                     
                     st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
-                        st.session_state.demanda_acumulada.get_demanda()
+                        st.session_state.acumulo_inicial
                     )
+                    # st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
+                    #     st.session_state.demanda_acumulada.get_demanda()
+                    # )
                 
     # Container 2: Área de visualização de gráficos de demanda e acumulo
     with st.container():
