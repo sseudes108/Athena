@@ -18,14 +18,13 @@ class Analista():
         self.carga_horaria = 0
             
         # Calcula a capacidade de produção ao instanciar o objeto
-        self.set_capacidade_producao()
+        self.set_capacidade_operacao()
         
     # Retorna a lista de horários (entrada, almoço, saída)
     def get_horarios(self):
         return [self.entrada, self.almoco, self.saida, self.carga_horaria]
                 
-    def set_capacidade_producao(self):
-        
+    def set_capacidade_operacao(self):
         df_sla = st.session_state.dataframe_sla.reset_index(drop=True)
         
         almoco_duracao = 60
@@ -69,11 +68,25 @@ class Analista():
             tempo_trabalhado.append(minutos_trabalhados)
                     
         # Agora calcula capacidade
-        capacidade = [floor(mins * 60 / st.session_state.tma) for mins in tempo_trabalhado]
-        self.capacidade_producao = capacidade
+        capacidade = [round(mins * 60 / st.session_state.tma, 2) for mins in tempo_trabalhado]
+        total_original = sum([round(mins * 60 / st.session_state.tma, 2) for mins in tempo_trabalhado if mins > 0])
+        self.capacidade_producao = normalizar_capacidade(capacidade, total_original)
         
         self.carga_horaria = saida_dt - entrada_dt
 
     # Retorna a lista de capacidade de produção por hora
-    def get_capacidade_producao(self):
+    def get_capacidade_operacao(self):
         return self.capacidade_producao
+
+def normalizar_capacidade(capacidade, total_original):
+    total_atual = sum(capacidade)
+    if total_atual == 0:
+        return capacidade
+    fator_correcao = total_original / total_atual
+    capacidade_corrigida = [round(c * fator_correcao, 2) for c in capacidade]
+    
+    diff = round(total_original - sum(capacidade_corrigida))
+    if diff != 0:
+        capacidade_corrigida[0] += diff  # distribui erro residual
+
+    return capacidade_corrigida

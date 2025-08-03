@@ -56,7 +56,7 @@ def draw_page():
         with inicio_col:
             st.session_state.inicio_op = st.selectbox(
                 label="Inicio Operacao", 
-                options=["07:00", "08:00"], 
+                options=["08:00", "07:00"], 
                 key="inicio_op_input"
             )
             
@@ -64,7 +64,7 @@ def draw_page():
         with fim_col:
             st.session_state.fim_op = st.selectbox(
                 label="Final Operacao", 
-                options=["22:00", "21:00"], 
+                options=["17:48", "22:00", "21:00"], 
                 key="fim_op_input"
             )
         
@@ -109,9 +109,11 @@ def draw_page():
                    
                     # Carrega o CSV para um DataFrame
                     st.session_state.df_csv = Data_Man.get_dataframe(uploaded_file)
+                    st.session_state.df_original = st.session_state.df_csv.copy()
                     
                     # Inicializa a calculadora de capacidade
                     st.session_state.calculadora = Calculadora()
+                    st.session_state.calculadora.set_streamlit(st)
                                     
                     # Atualizada dataframe com base no SLA
                     st.session_state.dataframe_sla = Data_Man.get_dataframe_sla(st.session_state.df_csv, st.session_state.sla)
@@ -125,38 +127,44 @@ def draw_page():
                     )
                                         
                     # Cria instâncias para gestão de dados
-                    (st.session_state.demanda_atual, 
-                    st.session_state.demanda_acumulada, 
+                    (st.session_state.demanda_acumulada, 
                     st.session_state.capacidade_operacional) = st.session_state.calculadora.create_instancias()
                     
                     # Configura demanda inicial a partir do CSV
                     st.session_state.demanda_inicial = st.session_state.dataframe_sla['quantidade'].tolist()
-                    st.session_state.demanda_atual.set_demanda(st.session_state.demanda_inicial)
                     
                     # Calcula acumulo inicial e configura instância
-                    st.session_state.acumulo_inicial = st.session_state.calculadora.calcular_acumulo(st.session_state.demanda_inicial)
-                    st.session_state.demanda_acumulada.set_demanda(st.session_state.acumulo_inicial)
+                    st.session_state.acumulo_inicial = st.session_state.calculadora.calcular_acumulo_backlog(
+                            st.session_state.demanda_inicial, 
+                            st.session_state.capacidade_operacional.get_capacidade_operacao(),
+                            Data_Man.encontrar_proximo_indice(st.session_state.dataframe_sla, st.session_state.inicio_op),
+                            Data_Man.encontrar_proximo_indice(st.session_state.dataframe_sla, st.session_state.fim_op)
+                        )
                     
+                    st.session_state.demanda_acumulada.set_demanda(st.session_state.acumulo_inicial)
+                                        
                     # Executa o algoritmo Athena para cálculo de capacidade
-                    st.session_state.analistas_lista = st.session_state.calculadora.athena(
-                        st.session_state.tma, 
-                        st.session_state.demanda_atual, 
-                        st.session_state.demanda_acumulada, 
-                        st.session_state.capacidade_operacional
-                    )
+                    st.session_state.analistas_lista = st.session_state.calculadora.athena()
 
                     # Prepara DataFrames para visualização gráfica
                     st.session_state.df_derivacao = Data_Man.get_custom_dataframe(
                         st.session_state.dataframe_sla['quantidade'].tolist()
                     )
                     st.session_state.df_producao = Data_Man.get_custom_dataframe(
-                        st.session_state.capacidade_operacional.get_capacidade_producao()
-                    )
-                    st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
-                        st.session_state.demanda_acumulada.get_demanda()
+                        st.session_state.capacidade_operacional.get_capacidade_operacao()
                     )
                     
-                    print(st.session_state.capacidade_operacional.get_capacidade_producao())
+                    acumulo_atualizado = st.session_state.calculadora.calcular_acumulo_backlog(
+                            st.session_state.demanda_inicial, 
+                            st.session_state.capacidade_operacional.get_capacidade_operacao(),
+                            Data_Man.encontrar_proximo_indice(st.session_state.dataframe_sla, st.session_state.inicio_op),
+                            Data_Man.encontrar_proximo_indice(st.session_state.dataframe_sla, st.session_state.fim_op)
+                        )
+                    
+                    st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
+                        acumulo_atualizado
+                    )
+                    
                 else:
                     st.session_state.df_derivacao = st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
                         st.session_state.dataframe_sla['quantidade'].tolist()
@@ -164,19 +172,20 @@ def draw_page():
                     
                     # atualizado ao adicionar ou remover analista, cada um tem uma logica diferente
                     st.session_state.df_producao = Data_Man.get_custom_dataframe(
-                        st.session_state.capacidade_operacional.get_capacidade_producao()
+                        st.session_state.capacidade_operacional.get_capacidade_operacao()
                     )
                     
-                    acumulo_atualizado = [a - b for a, b in zip(st.session_state.demanda_acumulada.get_demanda(), st.session_state.capacidade_operacional.get_capacidade_producao())]
-                    acumulo_atualizado_sem_negativos = [max(0, v) for v in acumulo_atualizado]
-                    st.session_state.demanda_acumulada.set_demanda(acumulo_atualizado_sem_negativos)
+                    acumulo_atualizado = st.session_state.calculadora.calcular_acumulop_backlog(
+                        st.session_state.demanda_inicial, 
+                        st.session_state.capacidade_operacional.get_capacidade_operacao(),
+                        Data_Man.encontrar_proximo_indice(st.session_state.dataframe_sla, st.session_state.inicio_op),
+                        Data_Man.encontrar_proximo_indice(st.session_state.dataframe_sla, st.session_state.fim_op)
+                    )
+                    st.session_state.demanda_acumulada.set_demanda(acumulo_atualizado)
                     
                     st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
                         st.session_state.acumulo_inicial
                     )
-                    # st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
-                    #     st.session_state.demanda_acumulada.get_demanda()
-                    # )
                 
     # Container 2: Área de visualização de gráficos de demanda e acumulo
     with st.container():
@@ -265,23 +274,23 @@ def draw_page():
                             st.button(
                                 label="➕ Add",
                                 key=f'add_{index}',
-                                on_click=partial(
-                                    st.session_state.calculadora.add_analista,
-                                    entrada=row['entrada'].strftime('%H:%M'),
-                                    almoco=row['almoco'].strftime('%H:%M'),
-                                    saida=row['saida'].strftime('%H:%M')
-                                )
+                                # on_click=partial(
+                                #     st.session_state.calculadora.add_analista,
+                                #     entrada=row['entrada'].strftime('%H:%M'),
+                                #     almoco=row['almoco'].strftime('%H:%M'),
+                                #     saida=row['saida'].strftime('%H:%M')
+                                # )
                             )
                         with rem_bttn_col:
                             st.button(
                                 label="➖ Rem", 
                                 key=f'rem_{index}',
-                                on_click=partial(
-                                    st.session_state.calculadora.rem_analista,
-                                    entrada=row['entrada'].strftime('%H:%M'),
-                                    almoco=row['almoco'].strftime('%H:%M'),
-                                    saida=row['saida'].strftime('%H:%M')
-                                )
+                                # on_click=partial(
+                                #     st.session_state.calculadora.rem_analista,
+                                #     entrada=row['entrada'].strftime('%H:%M'),
+                                #     almoco=row['almoco'].strftime('%H:%M'),
+                                #     saida=row['saida'].strftime('%H:%M')
+                                # )
                             )
                             
                     with contagem_col:

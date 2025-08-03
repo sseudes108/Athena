@@ -14,10 +14,6 @@ class Demanda():
     def get_demanda(self):
         return self.demanda
     
-class DemandaAtual(Demanda):
-    def __init__(self):
-        super().__init__()  # Herda a estrutura da classe Demanda
-
 class DemandaAcumulada(Demanda):
     def __init__(self):
         super().__init__()
@@ -32,9 +28,9 @@ class CapacidadeOperacional(Demanda):
         super().__init__()
 
     # Define a capacidade de produção (igual a set_demanda mas com nome semântico)
-    def set_capacidade_producao(self, capacidade):
+    def set_capacidade_operacao(self, capacidade):
         self.demanda = capacidade
 
     # Retorna a capacidade de produção
-    def get_capacidade_producao(self):
+    def get_capacidade_operacao(self):
         return self.demanda

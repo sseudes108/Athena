@@ -1,0 +1,182 @@
+import math
+from ortools.sat.python import cp_model
+from Model.analista import Analista
+import Control.manager_data as Data_Man
+
+def encontrar_min_analistas(streamlit):
+    min_analistas = 10  # Mínimo de 10 analistas conforme requisito
+    max_analistas = 100  # Máximo de 100 analistas conforme requisito
+    melhor_solucao = None
+
+    while min_analistas <= max_analistas:
+        mid = (min_analistas + max_analistas) // 2
+        print(f"Tentando com {mid} analistas...")
+        status, solucao = resolver_alocacao(mid, streamlit)
+
+        if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
+            melhor_solucao = solucao
+            max_analistas = mid - 1  # Tenta reduzir o número de analistas
+        else:
+            min_analistas = mid + 1  # Precisa de mais analistas
+
+    return melhor_solucao
+
+def resolver_alocacao(MAX_ANALISTAS, streamlit):
+    model = cp_model.CpModel()
+    
+    # Horário de operação: 07:00 às 22:00
+    inicio_op = 7
+    fim_op = 22
+    HORAS = list(range(inicio_op, fim_op + 1))  # [7, 8, ..., 22]
+    DEMANDA = streamlit.df_original['quantidade'].tolist()[inicio_op:fim_op + 1]
+    TMA_EM_SEGUNDOS = streamlit.tma
+    PROPOSTAS_POR_HORA = int(3600 / TMA_EM_SEGUNDOS)
+
+    # Definição dos turnos possíveis
+    TURNOS = [
+        # Turnos de 8h de trabalho + 1h de almoço (9h no total)
+        {'entrada': 7, 'saida': 16},   # 07:00 - 16:00
+        {'entrada': 8, 'saida': 17},   # 08:00 - 17:00
+        {'entrada': 9, 'saida': 18},   # 09:00 - 18:00
+        {'entrada': 10, 'saida': 19},  # 10:00 - 19:00
+        {'entrada': 11, 'saida': 20},  # 11:00 - 20:00
+        {'entrada': 12, 'saida': 21},  # 12:00 - 21:00
+        {'entrada': 13, 'saida': 22},  # 13:00 - 22:00
+        # Turnos de 7h20 de trabalho + 1h de almoço
+        {'entrada': 7, 'saida': 15.334},  # 07:00 - 15:20
+        {'entrada': 8, 'saida': 16.334},  # 08:00 - 16:20
+        {'entrada': 9, 'saida': 17.334},  # 09:00 - 17:20
+        {'entrada': 10, 'saida': 18.334}, # 10:00 - 18:20
+        {'entrada': 11, 'saida': 19.334}, # 11:00 - 19:20
+        {'entrada': 12, 'saida': 20.334}, # 12:00 - 20:20
+        {'entrada': 13, 'saida': 21.334}, # 13:00 - 21:20
+        # {'entrada': 14, 'saida': 22},     # 14:00 - 22:00
+    ]
+
+    # Variáveis de decisão
+    x = {}          # Indica se o analista 'a' trabalha na hora 'h'
+    almoco = {}     # Indica o horário de almoço do analista 'a'
+    turno_analista = {}  # Indica qual turno o analista 'a' segue
+
+    # Definir variáveis
+    for a in range(MAX_ANALISTAS):
+        # Cada analista está em exatamente um turno
+        for t in range(len(TURNOS)):
+            turno_analista[a, t] = model.NewBoolVar(f"turno_{a}_{t}")
+        model.Add(sum(turno_analista[a, t] for t in range(len(TURNOS))) == 1)
+
+        # Variáveis de trabalho por hora
+        for h in HORAS:
+            x[a, h] = model.NewBoolVar(f"x_{a}_{h}")
+
+        # Variáveis de almoço para todas as horas
+        for h in HORAS:
+            almoco[a, h] = model.NewBoolVar(f"almoco_{a}_{h}")
+
+    # Definir possíveis horários de almoço para cada turno
+    almoco_possiveis = {}
+    for t in range(len(TURNOS)):
+        entrada = TURNOS[t]['entrada']
+        saida = TURNOS[t]['saida']
+        almoco_possiveis[t] = [h for h in HORAS if h >= entrada + 4 and h + 1 <= saida - 2]
+
+    # Adicionar constraints para almoço e trabalho
+    for a in range(MAX_ANALISTAS):
+        for t in range(len(TURNOS)):
+            # Se no turno t, exatamente um almoço nos horários possíveis
+            model.Add(sum(almoco[a, h] for h in almoco_possiveis[t]) == 1).OnlyEnforceIf(turno_analista[a, t])
+            # Forçar almoco[a, h] == 0 para h não em almoco_possiveis[t]
+            for h in HORAS:
+                if h not in almoco_possiveis[t]:
+                    model.Add(almoco[a, h] == 0).OnlyEnforceIf(turno_analista[a, t])
+
+            # Definir horas de trabalho para o turno t
+            horas_trabalho = [h for h in HORAS if TURNOS[t]['entrada'] <= h < TURNOS[t]['saida']]
+            if TURNOS[t]['saida'] % 1 != 0:
+                horas_trabalho = horas_trabalho[:-1]  # Ajustar para turnos parciais
+
+            # Para h em horas_trabalho: x[a, h] == 1 a menos que almoco[a, h] == 1
+            for h in horas_trabalho:
+                model.Add(x[a, h] == 1).OnlyEnforceIf([turno_analista[a, t], almoco[a, h].Not()])
+                model.Add(x[a, h] == 0).OnlyEnforceIf([turno_analista[a, t], almoco[a, h]])
+
+            # Para h não em horas_trabalho: x[a, h] == 0
+            for h in HORAS:
+                if h not in horas_trabalho:
+                    model.Add(x[a, h] == 0).OnlyEnforceIf(turno_analista[a, t])
+
+    # # Restrição de demanda por hora
+    # for i, h in enumerate(HORAS):
+    #     model.Add(sum(x[a, h] for a in range(MAX_ANALISTAS)) * PROPOSTAS_POR_HORA >= DEMANDA[i])
+    
+    for i, h in enumerate(HORAS):
+        if h == 7:
+            required_demand = int(math.ceil(0.5 * DEMANDA[i]))  # Apenas metade pois é o acumulo noturno
+            model.Add(sum(x[a, h] for a in range(MAX_ANALISTAS)) * PROPOSTAS_POR_HORA >= required_demand)
+        else:
+            required_demand = int(math.ceil(1.5 * DEMANDA[i]))  # 10% de extra
+            model.Add(sum(x[a, h] for a in range(MAX_ANALISTAS)) * PROPOSTAS_POR_HORA >= DEMANDA[i])
+
+    # Garantir acumulação zero às 10:00 e 22:00
+    demanda_acumulada_10 = sum(DEMANDA[:HORAS.index(10)])
+    capacidade_acumulada_10 = sum(sum(x[a, h] for h in HORAS[:HORAS.index(10)]) 
+                                 for a in range(MAX_ANALISTAS)) * PROPOSTAS_POR_HORA
+    model.Add(capacidade_acumulada_10 >= demanda_acumulada_10)
+
+    demanda_acumulada_22 = sum(DEMANDA)
+    capacidade_acumulada_22 = sum(sum(x[a, h] for h in HORAS) 
+                                 for a in range(MAX_ANALISTAS)) * PROPOSTAS_POR_HORA
+    model.Add(capacidade_acumulada_22 >= demanda_acumulada_22)
+
+    # Resolver o modelo
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = 30.0
+    status = solver.Solve(model)
+
+    solucao = []
+    if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
+        for a in range(MAX_ANALISTAS):
+            for t in range(len(TURNOS)):
+                if solver.Value(turno_analista[a, t]):
+                    horas = [h for h in HORAS if solver.Value(x[a, h])]
+                    almoco_h = next((h for h in HORAS if solver.Value(almoco[a, h])), None)
+                    solucao.append((a, TURNOS[t], horas, almoco_h))
+    return status, solucao
+
+def athena(streamlit, calculadora):
+    analistas = []
+    capacidade_producao = [0] * len(streamlit.dataframe_sla['horario'].tolist())
+    print(f"seg_sex_848.py Dem Ini - {sum(streamlit.demanda_inicial)}")
+    
+    solucao = encontrar_min_analistas(streamlit)
+    
+    # Inicializa a capacidade operacional no streamlit
+    streamlit.capacidade_operacional.set_capacidade_operacao(capacidade_producao)
+    
+    for a, turno, horas, almoco_h in solucao:
+        entrada = f"{turno['entrada']:02d}:00"
+        saida = (f"{int(turno['saida']):02d}:{int((turno['saida'] % 1) * 60):02d}" 
+                 if turno['saida'] % 1 != 0 else f"{int(turno['saida']):02d}:00")
+        almoco = f"{almoco_h}:00"
+        novo_analista = Analista(streamlit.tma, entrada, almoco, saida)
+        analistas.append(novo_analista)
+        
+        # Obtém a capacidade atual de streamlit
+        capacidade_atual = streamlit.capacidade_operacional.get_capacidade_operacao()
+        
+        # Calcula a nova capacidade
+        capacidade_nova = [a + b for a, b in zip(capacidade_atual, novo_analista.get_capacidade_operacao())]
+        
+        # Atualiza o objeto streamlit
+        streamlit.capacidade_operacional.set_capacidade_operacao(capacidade_nova)
+        
+        acumulo_atualizado = calculadora.calcular_acumulo_backlog(
+            streamlit.demanda_inicial, 
+            capacidade_nova,
+            Data_Man.encontrar_proximo_indice(streamlit.dataframe_sla, streamlit.inicio_op),
+            Data_Man.encontrar_proximo_indice(streamlit.dataframe_sla, streamlit.fim_op)
+        )
+        streamlit.demanda_acumulada.set_demanda(acumulo_atualizado)
+    
+    print(f"seg_sex_848.py Cap Ope - {sum(streamlit.capacidade_operacional.get_capacidade_operacao())}")
+    return analistas

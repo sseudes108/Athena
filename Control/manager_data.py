@@ -65,36 +65,32 @@ def get_custom_dataframe(quantidade):
     return df
 
 def get_range(dataframe, inicio_op:str, fim_op:str):
-    """
-    Calcula o range horário operacional como intervalo numérico
-    
-    Parâmetros:
-        inicio_op: String no formato "HH:MM" (ex: "08:00")
-        fim_op: String no formato "HH:MM" (ex: "18:00")
-        
-    Retorna:
-        Lista com [hora_inicio, hora_fim-1] (intervalo fechado-início, aberto-fim)
-        Ex: ["08:00", "18:00"] → [8, 17]
-    """
-    hora_inicio_index = encontrar_indice_por_horario(dataframe, inicio_op)
-    hora_fim_index = encontrar_indice_por_horario(dataframe, fim_op)
+    hora_inicio_index = encontrar_proximo_indice(dataframe, inicio_op)
+    hora_fim_index = encontrar_proximo_indice(dataframe, fim_op)
     return[hora_inicio_index, hora_fim_index]
 
-def encontrar_indice_por_horario(df:pd.DataFrame, horario_alvo):
-    """
-    Encontra o índice da linha onde a hora (sem data) é igual ao horário alvo.
-    Aceita `str` (ex: '10:00') ou `datetime.time`
-    """
-
+def encontrar_proximo_indice(df: pd.DataFrame, horario_alvo):
+    # Converte para datetime.time se for string
     if isinstance(horario_alvo, str):
         horario_alvo = datetime.strptime(horario_alvo, "%H:%M").time()
-    
-    matches = df.index[df['horario'].dt.time == horario_alvo].tolist()
 
-    if matches:
-        return matches[0]
+    # Garante que a coluna 'horario' é datetime
+    if not pd.api.types.is_datetime64_any_dtype(df['horario']):
+        raise ValueError("A coluna 'horario' deve ser do tipo datetime.")
+
+    # Converte o alvo para minutos desde 00:00
+    alvo_minutos = horario_alvo.hour * 60 + horario_alvo.minute
+
+    # Converte todos os horários para minutos
+    horarios_minutos = df['horario'].dt.hour * 60 + df['horario'].dt.minute
+
+    # Filtra apenas os horários posteriores ou iguais
+    candidatos = horarios_minutos[horarios_minutos >= alvo_minutos]
+
+    if not candidatos.empty:
+        return candidatos.idxmin()  # Retorna o índice do menor horário >= alvo
     else:
-        return None
+        return None  # Nenhum horário maior encontrado
 
 def converte_blocos_para_tempo(df):
     df = df.copy()
@@ -139,7 +135,8 @@ def get_dataframe_sla(dataframe_original, sla):
         df_merged['quantidade'] = df_merged['quantidade'] / intervalos_por_hora
 
     # Seleciona colunas finais
-    df_final = df_merged[['horario', 'quantidade']]
+    df_final = df_merged[['horario', 'quantidade']].copy()
+    # df_final['quantidade'] = df_final['quantidade'].astype(int)
     
     return df_final
 
@@ -174,3 +171,9 @@ def formatar_timedelta_para_hora_minuto(td: timedelta) -> str:
     horas = total_minutos // 60
     minutos = total_minutos % 60
     return f"{horas:02d}:{minutos:02d}"
+
+def str_to_datetime(str):
+    return datetime.strptime(str, '%H:%M')
+
+def datetime_to_str(dt):
+    return dt.strftime('%H:%M')
