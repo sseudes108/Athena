@@ -10,6 +10,34 @@ from Control import manager_data as Data_Man  # Gerenciador de dados
 from Control import manager_save as Save_Man
 from Control.calculadora import Calculadora  # Lógica de cálculo de capacidade
 
+def verificar_condicoes():
+    # Verifica se a flag 'athena' existe no estado da sessão
+    if 'athena' not in st.session_state:
+        st.session_state.athena = False
+        
+    if 'action_user' not in st.session_state or st.session_state.get('action_user') in ('add','rem'):
+        print(f"👁️ {st.session_state.get('action_user')}")
+        return
+        
+    if 'tma_previo' not in st.session_state or st.session_state.tma_previo != st.session_state.tma:
+        st.session_state.athena = False  # força recalcular
+        st.session_state.tma_previo = st.session_state.tma
+        
+    if 'sla_previo' not in st.session_state or st.session_state.sla_previo != st.session_state.sla:
+        st.session_state.athena = False  # força recalcular
+        st.session_state.sla_previo = st.session_state.sla
+        
+    if 'inicio_op_previo' not in st.session_state or st.session_state.inicio_op_previo != st.session_state.inicio_op:
+        st.session_state.athena = False  # força recalcular
+        st.session_state.inicio_op_previo = st.session_state.inicio_op
+        
+    if 'fim_op_previo' not in st.session_state or st.session_state.fim_op_previo != st.session_state.fim_op:
+        st.session_state.athena = False  # força recalcular
+        st.session_state.fim_op_previo = st.session_state.fim_op
+        
+    if 'uploaded_file' not in st.session_state or st.session_state.uploaded_file is not None:
+        st.session_state.athena = False  # força recalcular
+
 def draw_page():
     """Função principal que renderiza toda a página da aplicação"""
     
@@ -26,7 +54,7 @@ def draw_page():
         with tma_col:
             st.session_state.tma = st.number_input(
                 label="TMA - Segundos", 
-                value=192, 
+                value=2880, 
                 step=1, 
                 key="tma_input"
             )
@@ -57,7 +85,7 @@ def draw_page():
         with inicio_col:
             st.session_state.inicio_op = st.selectbox(
                 label="Inicio Operacao", 
-                options=["07:00", "08:00"], 
+                options=["08:00", "07:00", "08:00"], 
                 key="inicio_op_input"
             )
             
@@ -65,33 +93,10 @@ def draw_page():
         with fim_col:
             st.session_state.fim_op = st.selectbox(
                 label="Final Operacao", 
-                options=["22:00", "17:48", "21:00"], 
+                options=["17:48", "22:00", "17:48", "21:00"], 
                 key="fim_op_input"
             )
-        
-        # Verifica se a flag 'athena' existe no estado da sessão
-        if 'athena' not in st.session_state:
-            st.session_state.athena = False
-            
-        if 'tma_previo' not in st.session_state or st.session_state.tma_previo != st.session_state.tma:
-            st.session_state.athena = False  # força recalcular
-            st.session_state.tma_previo = st.session_state.tma
-            
-        if 'sla_previo' not in st.session_state or st.session_state.sla_previo != st.session_state.sla:
-            st.session_state.athena = False  # força recalcular
-            st.session_state.sla_previo = st.session_state.sla
-            
-        if 'inicio_op_previo' not in st.session_state or st.session_state.inicio_op_previo != st.session_state.inicio_op:
-            st.session_state.athena = False  # força recalcular
-            st.session_state.inicio_op_previo = st.session_state.inicio_op
-            
-        if 'fim_op_previo' not in st.session_state or st.session_state.fim_op_previo != st.session_state.fim_op:
-            st.session_state.athena = False  # força recalcular
-            st.session_state.fim_op_previo = st.session_state.fim_op
-            
-        if 'uploaded_file' not in st.session_state or st.session_state.uploaded_file is not None:
-            st.session_state.athena = False  # força recalcular
-                    
+                            
         # Coluna 5: Upload de arquivo CSV com dados de produção
         with upload_col:
             uploaded_file = st.file_uploader(label="CSV")
@@ -104,9 +109,12 @@ def draw_page():
                 st.session_state.df_producao = Data_Man.get_dataframe_vazio()
                 st.session_state.df_acumulo = Data_Man.get_dataframe_vazio()
                 
-            else:                         
+            else:
+                verificar_condicoes()    
+                              
                 # Fluxo para processamento inicial do arquivo
                 if st.session_state.athena == False:
+                    print("Athena False 🗡️")
                    
                     # Carrega o CSV para um DataFrame
                     st.session_state.df_csv = Data_Man.get_dataframe(uploaded_file)
@@ -167,91 +175,41 @@ def draw_page():
                     )
                     
                 else:
+                    print("Athena True ⚔️")
                     st.session_state.df_derivacao = st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
                         st.session_state.dataframe_sla['quantidade'].tolist()
                     )
-                    
-                    # atualizado ao adicionar ou remover analista, cada um tem uma logica diferente
+
                     st.session_state.df_producao = Data_Man.get_custom_dataframe(
                         st.session_state.capacidade_operacional.get_capacidade_operacao()
                     )
-                    
-                    acumulo_atualizado = st.session_state.calculadora.calcular_acumulop_backlog(
-                        st.session_state.demanda_inicial, 
-                        st.session_state.capacidade_operacional.get_capacidade_operacao(),
-                        Data_Man.encontrar_proximo_indice(st.session_state.dataframe_sla, st.session_state.inicio_op),
-                        Data_Man.encontrar_proximo_indice(st.session_state.dataframe_sla, st.session_state.fim_op)
-                    )
-                    st.session_state.demanda_acumulada.set_demanda(acumulo_atualizado)
-                    
+                                  
                     st.session_state.df_acumulo = Data_Man.get_custom_dataframe(
-                        st.session_state.acumulo_inicial
+                        st.session_state.demanda_acumulada.get_demanda()
                     )
                 
     # Container 2: Área de visualização de gráficos de demanda e acumulo
     with st.container():
         st.caption("Graficos")
         
-        # Cria abas para diferentes dias da semana
-        du_tab, sab_tab, dom_tab = st.tabs([
-            "Dia Util",
-            "Sabado",
-            "Domingo"
-        ])
-        
-        # Tab 1: Dias Úteis
-        with du_tab:
-            der_cap_col, acum_col = st.columns([1,1])
+        der_cap_col, acum_col = st.columns([1,1])
             
-            with der_cap_col:
-                # Gráfico de demanda vs capacidade
-                Graficos.draw_grafico_demanda_capacidade('du_cap')
+        with der_cap_col:
+            # Gráfico de demanda vs capacidade
+            Graficos.draw_grafico_demanda_capacidade('du_cap')
+            st.caption(f"Derivação: {sum(st.session_state.df_derivacao['quantidade'].tolist())} - Capacidade: {sum(st.session_state.df_producao['quantidade'].tolist())}")
 
-            with acum_col:
-                # Gráfico de acumulação
-                Graficos.draw_grafico_acumulo('du_acum')
-                
-            with st.container():
-                hist_der_col, hist_acul_col = st.columns([1,1])
-                with hist_der_col:
-                    Graficos.draw_hist_dist(st.session_state.df_derivacao, 'der_dist_du', 1, 'Distribuição da Derivação Inicial')
-                with hist_acul_col:
-                    Graficos.draw_hist_dist(st.session_state.df_acumulo, 'aculm_dist_du', 2, 'Distribuição do Acumulo')
-                                
-        # Tab 2: Sábados
-        with sab_tab:
-            der_cap_col, acum_col = st.columns([1,1])
+        with acum_col:
+            # Gráfico de acumulação
+            Graficos.draw_grafico_acumulo('du_acum')
             
-            with der_cap_col:
-                Graficos.draw_grafico_demanda_capacidade('sab_cap')
-            
-            with acum_col:
-                Graficos.draw_grafico_acumulo('sab_acum')
-                
-            with st.container():
-                hist_der_col, hist_acul_col = st.columns([1,1])
-                with hist_der_col:
-                    Graficos.draw_hist_dist(st.session_state.df_derivacao, 'der_dist_sab', 1, 'Distribuição da Derivação Inicial')
-                with hist_acul_col:
-                    Graficos.draw_hist_dist(st.session_state.df_acumulo, 'aculm_dist_sab', 2, 'Distribuição do Acumulo')
-                
-        # Tab 3: Domingos
-        with dom_tab:
-            der_cap_col, acum_col = st.columns([1,1])
-            
-            with der_cap_col:
-                Graficos.draw_grafico_demanda_capacidade('dom_cap')
+        with st.container():
+            hist_der_col, hist_acul_col = st.columns([1,1])
+            with hist_der_col:
+                Graficos.draw_hist_dist(st.session_state.df_derivacao, 'der_dist_du', 1, 'Distribuição da Derivação Inicial')
+            with hist_acul_col:
+                Graficos.draw_hist_dist(st.session_state.df_acumulo, 'aculm_dist_du', 2, 'Distribuição do Acumulo')
 
-            with acum_col:
-                Graficos.draw_grafico_acumulo('dom_acum')
-                
-            with st.container():
-                hist_der_col, hist_acul_col = st.columns([1,1])
-                with hist_der_col:
-                    Graficos.draw_hist_dist(st.session_state.df_derivacao, 'der_dist_dom', 1, 'Distribuição da Derivação Inicial')
-                with hist_acul_col:
-                    Graficos.draw_hist_dist(st.session_state.df_acumulo, 'aculm_dist_dom', 2, 'Distribuição do Acumulo')
-    
     # Container 3: Área de exibição de resultados (tabela de analistas)
     with st.container():
         if uploaded_file is None:
@@ -275,23 +233,23 @@ def draw_page():
                             st.button(
                                 label="➕ Add",
                                 key=f'add_{index}',
-                                # on_click=partial(
-                                #     st.session_state.calculadora.add_analista,
-                                #     entrada=row['entrada'].strftime('%H:%M'),
-                                #     almoco=row['almoco'].strftime('%H:%M'),
-                                #     saida=row['saida'].strftime('%H:%M')
-                                # )
+                                on_click=partial(
+                                    st.session_state.calculadora.add_analista,
+                                    entrada=row['entrada'].strftime('%H:%M'),
+                                    almoco=row['almoco'].strftime('%H:%M'),
+                                    saida=row['saida'].strftime('%H:%M')
+                                )
                             )
                         with rem_bttn_col:
                             st.button(
                                 label="➖ Rem", 
                                 key=f'rem_{index}',
-                                # on_click=partial(
-                                #     st.session_state.calculadora.rem_analista,
-                                #     entrada=row['entrada'].strftime('%H:%M'),
-                                #     almoco=row['almoco'].strftime('%H:%M'),
-                                #     saida=row['saida'].strftime('%H:%M')
-                                # )
+                                on_click=partial(
+                                    st.session_state.calculadora.rem_analista,
+                                    entrada=row['entrada'].strftime('%H:%M'),
+                                    almoco=row['almoco'].strftime('%H:%M'),
+                                    saida=row['saida'].strftime('%H:%M')
+                                )
                             )
                             
                     with contagem_col:
@@ -305,7 +263,6 @@ def draw_page():
                     
                     with entrada_col:
                         st.caption("Entrada")
-                        print(row['entrada'])
                         horario_formatado = row['entrada'].strftime('%H:%M')
                         st.write(horario_formatado)
                     
@@ -321,6 +278,7 @@ def draw_page():
                                
                 st.divider()  # Separador visual entre analistas
             st.session_state.athena = True  # Ativa flag para evitar recálculos desnecessários
+            st.session_state.action_user = '---'
 
 def main():
     """Função de entrada da aplicação"""

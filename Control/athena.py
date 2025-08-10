@@ -2,7 +2,7 @@
 from Model.analista import Analista  # Classe que representa um analista
 # from Model.demanda import DemandaAtual, DemandaAcumulada, CapacidadeOperacional  # Modelos de dados
 import Control.manager_data as Data_Man
-from Control.Athena_Brain.Models import seg_sex_722, seg_sex_848, sla_oriented
+from Control.Athena_Brain.Models import seg_sex_722, seg_sex_848
 import Control.Athena_Brain.athena_lib as Brain
     
 def calcular_capacity(streamlit, calculadora):
@@ -20,8 +20,8 @@ def calcular_capacity(streamlit, calculadora):
     """    
     # Chama o modelo de cálculo principal
     
-    # response = modelo_seg_sex_848(streamlit, calculadora)
-    response = modelo_seg_sex_722(streamlit, calculadora)
+    response = modelo_seg_sex_848(streamlit, calculadora)
+    # response = modelo_seg_sex_722(streamlit, calculadora)
         
     return response
 
@@ -65,6 +65,3 @@ def modelo_seg_sex_848(streamlit, calculadora):
 
 def modelo_seg_sex_722(streamlit, calculadora):
     return seg_sex_722.athena(streamlit, calculadora)
-
-def modelo_sla_oriented(streamlit, calculadora):
-    return sla_oriented.athena(streamlit, calculadora)
