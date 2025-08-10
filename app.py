@@ -7,6 +7,7 @@ from Model.analista import Analista
 from View import layout as Layout  # Módulo para configuração de layout
 from View import graficos as Graficos  # Módulo para criação de gráficos
 from Control import manager_data as Data_Man  # Gerenciador de dados
+from Control import manager_save as Save_Man
 from Control.calculadora import Calculadora  # Lógica de cálculo de capacidade
 
 def draw_page():
@@ -25,7 +26,7 @@ def draw_page():
         with tma_col:
             st.session_state.tma = st.number_input(
                 label="TMA - Segundos", 
-                value=156, 
+                value=192, 
                 step=1, 
                 key="tma_input"
             )
@@ -35,7 +36,7 @@ def draw_page():
             st.session_state.sla = int(st.selectbox(
                 label="SLA - Minutos",
                 options=[
-                    '15',
+                    '60',
                     
                     '03',
                     '04',
@@ -46,7 +47,7 @@ def draw_page():
 
                     '20',
                     '30',
-                    '60'
+                    '15'
                 ],
                 key="sla_input"
             ))
@@ -56,7 +57,7 @@ def draw_page():
         with inicio_col:
             st.session_state.inicio_op = st.selectbox(
                 label="Inicio Operacao", 
-                options=["08:00", "07:00"], 
+                options=["07:00", "08:00"], 
                 key="inicio_op_input"
             )
             
@@ -64,7 +65,7 @@ def draw_page():
         with fim_col:
             st.session_state.fim_op = st.selectbox(
                 label="Final Operacao", 
-                options=["17:48", "22:00", "21:00"], 
+                options=["22:00", "17:48", "21:00"], 
                 key="fim_op_input"
             )
         
@@ -250,7 +251,7 @@ def draw_page():
                     Graficos.draw_hist_dist(st.session_state.df_derivacao, 'der_dist_dom', 1, 'Distribuição da Derivação Inicial')
                 with hist_acul_col:
                     Graficos.draw_hist_dist(st.session_state.df_acumulo, 'aculm_dist_dom', 2, 'Distribuição do Acumulo')
-        
+    
     # Container 3: Área de exibição de resultados (tabela de analistas)
     with st.container():
         if uploaded_file is None:
@@ -260,9 +261,9 @@ def draw_page():
             
             # Agrupa dados dos analistas para exibição
             len(f"{st.session_state.analistas_lista}")
-            analistas_agrupados = Data_Man.get_analistas_agrupados(st.session_state.analistas_lista)
+            st.session_state.analistas_agrupados = Data_Man.get_analistas_agrupados(st.session_state.analistas_lista)
             
-            for index, row in analistas_agrupados.iterrows():
+            for index, row in st.session_state.analistas_agrupados.iterrows():
                 with st.container():
                     # Divisão em colunas para diferentes informações
                     buttons_col, contagem_col, horario_total_col, entrada_col, almoco_col, saida_col = st.columns([1,0.7,1,1,1,1])
@@ -304,6 +305,7 @@ def draw_page():
                     
                     with entrada_col:
                         st.caption("Entrada")
+                        print(row['entrada'])
                         horario_formatado = row['entrada'].strftime('%H:%M')
                         st.write(horario_formatado)
                     

@@ -1,0 +1,12 @@
+{
+    "analistas": {
+        "columns": [
+            "entrada",
+            "almoco",
+            "saida",
+            "quantidade",
+            "carga_horaria"
+        ],
+        "data": [
+            [
+                

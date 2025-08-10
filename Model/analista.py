@@ -23,7 +23,7 @@ class Analista():
     # Retorna a lista de horários (entrada, almoço, saída)
     def get_horarios(self):
         return [self.entrada, self.almoco, self.saida, self.carga_horaria]
-                
+                    
     def set_capacidade_operacao(self):
         df_sla = st.session_state.dataframe_sla.reset_index(drop=True)
         
@@ -69,24 +69,14 @@ class Analista():
                     
         # Agora calcula capacidade
         capacidade = [round(mins * 60 / st.session_state.tma, 2) for mins in tempo_trabalhado]
-        total_original = sum([round(mins * 60 / st.session_state.tma, 2) for mins in tempo_trabalhado if mins > 0])
-        self.capacidade_producao = normalizar_capacidade(capacidade, total_original)
+        self.capacidade_producao = capacidade
         
-        self.carga_horaria = saida_dt - entrada_dt
+        carga_horaria = (saida_dt - timedelta(hours=1)) - entrada_dt
+        if carga_horaria == timedelta(hours=1):
+            carga_horaria = timedelta(hours=2)
+
+        self.carga_horaria = carga_horaria
 
     # Retorna a lista de capacidade de produção por hora
     def get_capacidade_operacao(self):
         return self.capacidade_producao
-
-def normalizar_capacidade(capacidade, total_original):
-    total_atual = sum(capacidade)
-    if total_atual == 0:
-        return capacidade
-    fator_correcao = total_original / total_atual
-    capacidade_corrigida = [round(c * fator_correcao, 2) for c in capacidade]
-    
-    diff = round(total_original - sum(capacidade_corrigida))
-    if diff != 0:
-        capacidade_corrigida[0] += diff  # distribui erro residual
-
-    return capacidade_corrigida
